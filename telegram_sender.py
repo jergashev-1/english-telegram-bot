@@ -58,4 +58,18 @@ def post_content(bot_token: str, channel_id: str, post: dict):
     else:
         # Avval rasmni yuboramiz
         response = requests.post(
-            f"{base_url}
+            f"{base_url}/sendPhoto",
+            data={"chat_id": channel_id, "photo": post["image_url"]},
+            timeout=30,
+        )
+        if not response.ok:
+            print(f"DEBUG: Telegram javobi: {response.text}")
+        response.raise_for_status()
+        # Keyin to'liq matnni (kerak bo'lsa bir nechta xabarga bo'lib) yuboramiz
+        response = _send_long_text(base_url, channel_id, post["text"])
+
+    if not response.ok:
+        print(f"DEBUG: Telegram javobi: {response.text}")
+    response.raise_for_status()
+    print(f"✅ {post['type']} posti muvaffaqiyatli yuborildi.")
+    return response.json()
