@@ -204,7 +204,7 @@ tuzilgan bo'lsin (boshqa mavzudan emas):
 4. [savol matni]
    A) ... B) ... C) ...
 
-Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
+||Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]||
 
 Postni Telegram formatida yozing (emoji ishlatilsin, lekin oshirib
 yubormang). Faqat post matnini yozing, boshqa izoh bermang.
@@ -243,7 +243,7 @@ tuzilgan bo'lsin (masalan, "so'zni ta'rifiga moslashtiring" yoki
 4. [savol matni]
    A) ... B) ... C) ...
 
-Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
+||Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]||
 
 Postni Telegram formatida yozing (emoji o'rinli ishlatilsin).
 Faqat post matnini yozing, boshqa izoh bermang.
@@ -282,7 +282,7 @@ idiomani tanlang" formatida):
 4. [savol matni]
    A) ... B) ... C) ...
 
-Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
+||Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]||
 
 Postni Telegram formatida yozing (emoji o'rinli ishlatilsin).
 Faqat post matnini yozing, boshqa izoh bermang.
@@ -316,7 +316,7 @@ qo'shing. Tuzilma:
 4. [savol matni]
    A) ... B) ... C) ...
 
-Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
+||Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]||
 
 Faqat post matnini yozing, boshqa izoh bermang.
 {_IMAGE_SCENE_INSTRUCTION}
