@@ -11,13 +11,20 @@ MATN UCHUN — Google Gemini API (BEPUL):
 
 RASM UCHUN — Pollinations.ai (BUTUNLAY BEPUL, kalit shart emas):
     Hech qanday ro'yxatdan o'tish, hech qanday API kalit kerak emas.
-    Oddiy HTTP so'rov orqali ishlaydi — shuning uchun kod ancha sodda.
     Rasmiy sayt: https://pollinations.ai
+
+ANIQ RASM UCHUN YONDASHUV:
+    Gemini'ning o'ziga har bir post oxirida "bu post uchun rasmda aynan
+    nima chizish kerak" degan qisqa tavsifni alohida, maxsus qatorda
+    ("IMAGE_SCENE: ...") yozishni so'raymiz. Keyin shu qatorni matndan
+    ajratib olib (foydalanuvchiga ko'rinmaydi), aynan shu tavsif asosida
+    rasm chizdiramiz. Bu umumiy/mavhum mavzu nomidan ko'ra ancha aniq
+    va mos rasm beradi.
 
 Har bir funksiya endi dict qaytaradi:
     {
         "type": "GRAMMAR" / "VOCABULARY" / "IDIOMS" / "READING",
-        "text": "...",          # Telegram posti matni
+        "text": "...",          # Telegram posti matni (IMAGE_SCENE qatorisiz)
         "image_url": "...",     # to'g'ridan-to'g'ri Telegram'ga yuborsa bo'ladigan rasm havolasi
     }
 """
@@ -67,6 +74,22 @@ DAY_THEMES = {
     "Sunday": "peaceful rest, a calm sunrise, preparing for a new week",
 }
 
+# Har bir prompt oxiriga qo'shiladigan umumiy ko'rsatma — Gemini'dan
+# rasm uchun aniq sahna tavsifini alohida qatorda so'raymiz.
+_IMAGE_SCENE_INSTRUCTION = """
+
+Postning ENG OXIRIGA, alohida qatorda, AYNAN quyidagi formatda yozing
+(bu qator foydalanuvchiga ko'rinmaydi, faqat rasm chizish uchun ishlatiladi):
+
+IMAGE_SCENE: [shu postning asosiy g'oyasini yoki eng birinchi misolini
+LITERAL (so'zma-so'z) tasvirlaydigan, ingliz tilida, 15-25 so'zli aniq
+sahna tavsifi — masalan grammar uchun aynan o'sha misol jumlada
+tasvirlangan voqeani chizing, idioma uchun idiomaning so'zma-so'z
+ma'nosini (masalan "under the weather" — kasal, xafa kayfiyatli odam)
+chizing, vocabulary uchun o'sha so'zning aniq ma'nosini ko'rsatadigan
+sahnani chizing]
+"""
+
 
 def _ask_gemini(prompt: str, max_tokens: int = 800) -> str:
     """Gemini API'ga so'rov yuboradi va matn javobini qaytaradi."""
@@ -78,31 +101,29 @@ def _ask_gemini(prompt: str, max_tokens: int = 800) -> str:
     return response.text.strip()
 
 
-def _extract_first_bold(text: str) -> str | None:
+def _extract_scene(text: str) -> tuple[str, str | None]:
     """
-    Generatsiya qilingan matndan BIRINCHI **qalin** qilingan so'z yoki
-    idiomani ajratib oladi (masalan birinchi vocabulary so'zi yoki
-    birinchi idioma). Bu rasmni aniq, mavzuga mos qilish uchun ishlatiladi.
+    Matn oxiridagi 'IMAGE_SCENE: ...' qatorini ajratib oladi va uni asosiy
+    matndan olib tashlaydi (foydalanuvchi buni ko'rmasligi kerak).
+    Qaytaradi: (tozalangan_matn, sahna_tavsifi_yoki_None)
     """
-    match = re.search(r"\*\*(.+?)\*\*", text)
-    if match:
-        return match.group(1).strip()
-    return None
+    match = re.search(r"IMAGE_SCENE:\s*(.+)", text, re.IGNORECASE)
+    if not match:
+        return text.strip(), None
+    scene = match.group(1).strip()
+    clean_text = text[:match.start()].strip()
+    return clean_text, scene
 
 
 def _build_image_url(description: str) -> str:
     """
     Pollinations.ai orqali BEPUL rasm havolasini quradi.
-    Bu havola to'g'ridan-to'g'ri Telegram'ning send_photo funksiyasiga
-    berilishi mumkin — rasmni oldindan yuklab olish shart emas.
-
-    model=flux — Pollinations'ning yuqori sifatli rasm modeli (standart
-    "turbo" modelidan ancha aniq va sifatli natija beradi).
+    model=flux — Pollinations'ning yuqori sifatli rasm modeli.
     """
     style = (
         "professional digital illustration, highly detailed, vibrant "
         "colors, sharp focus, high quality, clean composition, "
-        "no text, no words, no letters, no signature"
+        "no text, no words, no letters, no signature, no chalkboard writing"
     )
     full_prompt = f"{description}, {style}"
     encoded = urllib.parse.quote(full_prompt)
@@ -141,13 +162,11 @@ Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
 
 Postni Telegram formatida yozing (emoji ishlatilsin, lekin oshirib
 yubormang). Faqat post matnini yozing, boshqa izoh bermang.
+{_IMAGE_SCENE_INSTRUCTION}
 """
-    text = _ask_gemini(prompt, max_tokens=2200)
-    image_url = _build_image_url(
-        f"A clear educational illustration explaining the English grammar "
-        f"topic '{topic}', showing a classroom whiteboard or diagram with "
-        f"arrows connecting example sentences, teacher-style visual"
-    )
+    raw = _ask_gemini(prompt, max_tokens=2200)
+    text, scene = _extract_scene(raw)
+    image_url = _build_image_url(scene or f"a scene literally illustrating '{topic}'")
     return {"type": "GRAMMAR", "text": text, "image_url": image_url}
 
 
@@ -182,15 +201,11 @@ Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
 
 Postni Telegram formatida yozing (emoji o'rinli ishlatilsin).
 Faqat post matnini yozing, boshqa izoh bermang.
+{_IMAGE_SCENE_INSTRUCTION}
 """
-    text = _ask_gemini(prompt, max_tokens=2200)
-    keyword = _extract_first_bold(text) or theme
-    image_url = _build_image_url(
-        f"A vivid, realistic scene clearly depicting the concept of "
-        f"'{keyword}' (related to the theme of {theme}), with "
-        f"recognizable objects and people directly illustrating this "
-        f"exact word, warm lighting, magazine-quality photo-illustration"
-    )
+    raw = _ask_gemini(prompt, max_tokens=2200)
+    text, scene = _extract_scene(raw)
+    image_url = _build_image_url(scene or f"a scene about the theme '{theme}'")
     return {"type": "VOCABULARY", "text": text, "image_url": image_url}
 
 
@@ -225,21 +240,17 @@ Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
 
 Postni Telegram formatida yozing (emoji o'rinli ishlatilsin).
 Faqat post matnini yozing, boshqa izoh bermang.
+{_IMAGE_SCENE_INSTRUCTION}
 """
-    text = _ask_gemini(prompt, max_tokens=2200)
-    idiom = _extract_first_bold(text) or theme
-    image_url = _build_image_url(
-        f"A creative, LITERAL visual depiction of the English idiom "
-        f"'{idiom}' — draw exactly what the words describe, in a fun "
-        f"storybook illustration style, whimsical and imaginative scene "
-        f"that visually explains the idiom's literal meaning"
-    )
+    raw = _ask_gemini(prompt, max_tokens=2200)
+    text, scene = _extract_scene(raw)
+    image_url = _build_image_url(scene or f"a literal depiction of {theme}")
     return {"type": "IDIOMS", "text": text, "image_url": image_url}
 
 
 def generate_reading_test() -> dict:
     """Reading matni + 4 ta tushunish savoli + mos illustratsiya generatsiya qiladi."""
-    prompt = """
+    prompt = f"""
 Siz ingliz tili o'qituvchisisiz. Telegram kanali uchun qisqa (100-150 so'zli)
 reading matni yozing (intermediate daraja), so'ngra AYNAN o'sha matn
 asosida 4 ta tushunish savoli (multiple choice, A/B/C variantlari bilan)
@@ -262,13 +273,11 @@ qo'shing. Tuzilma:
 Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
 
 Faqat post matnini yozing, boshqa izoh bermang.
+{_IMAGE_SCENE_INSTRUCTION}
 """
-    text = _ask_gemini(prompt, max_tokens=2200)
-    image_url = _build_image_url(
-        "A cozy, realistic photo-illustration of a person reading an open "
-        "book in a quiet library or study corner, warm ambient lighting, "
-        "detailed and inviting"
-    )
+    raw = _ask_gemini(prompt, max_tokens=2200)
+    text, scene = _extract_scene(raw)
+    image_url = _build_image_url(scene or "a cozy reading scene")
     return {"type": "READING", "text": text, "image_url": image_url}
 
 
