@@ -21,6 +21,10 @@ def post_content(bot_token: str, channel_id: str, post: dict):
     """
     base_url = f"https://api.telegram.org/bot{bot_token}"
 
+    # Diagnostika uchun: CHANNEL_ID qanday qiymat ekanini (uzunligi bilan)
+    # log'ga chiqaramiz — bo'shliq yoki ko'rinmas belgilarni aniqlash uchun.
+    print(f"DEBUG: CHANNEL_ID qiymati={channel_id!r} (uzunligi: {len(channel_id)})")
+
     if len(post["text"]) <= CAPTION_LIMIT:
         response = requests.post(
             f"{base_url}/sendPhoto",
@@ -38,6 +42,8 @@ def post_content(bot_token: str, channel_id: str, post: dict):
             data={"chat_id": channel_id, "photo": post["image_url"]},
             timeout=30,
         )
+        if not response.ok:
+            print(f"DEBUG: Telegram javobi: {response.text}")
         response.raise_for_status()
         # Keyin to'liq matnni alohida xabar sifatida yuboramiz
         response = requests.post(
@@ -46,6 +52,8 @@ def post_content(bot_token: str, channel_id: str, post: dict):
             timeout=30,
         )
 
+    if not response.ok:
+        print(f"DEBUG: Telegram javobi: {response.text}")
     response.raise_for_status()
     print(f"✅ {post['type']} posti muvaffaqiyatli yuborildi.")
     return response.json()
