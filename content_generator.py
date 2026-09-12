@@ -140,14 +140,51 @@ def _build_image_url(description: str) -> str:
     )
 
 
+_cached_image_model_name = None
+
+
+def _discover_image_model() -> str | None:
+    """
+    Hisobingizda haqiqatda mavjud bo'lgan rasm generatsiya modelini
+    AVTOMATIK ravishda topadi (qattiq yozilgan nom o'rniga). Bu model
+    nomlari o'zgarib turgan taqdirda ham tizim ishlashda davom etishini
+    ta'minlaydi — sizga loglarni tekshirish shart bo'lmaydi.
+    """
+    global _cached_image_model_name
+    if _cached_image_model_name is not None:
+        return _cached_image_model_name
+
+    try:
+        candidates = []
+        for m in genai.list_models():
+            name = m.name.replace("models/", "")
+            methods = getattr(m, "supported_generation_methods", [])
+            if "generateContent" in methods and "image" in name.lower():
+                candidates.append(name)
+
+        # Afzallik tartibi: "flash-image" nomli modellar odatda bepul
+        # rejaga ega bo'ladi, "pro-image" esa ko'pincha pullik.
+        candidates.sort(key=lambda n: (0 if "flash" in n.lower() else 1, n))
+
+        if candidates:
+            _cached_image_model_name = candidates[0]
+            print(f"🔍 Topilgan rasm modeli: {_cached_image_model_name}")
+            return _cached_image_model_name
+    except Exception as e:
+        print(f"⚠️ Modellar ro'yxatini olishda xato: {e}")
+
+    return None
+
+
 def _generate_image(description: str) -> dict:
     """
-    Avval Gemini'ning o'z rasm modeli (Nano Banana) orqali rasm chizishga
-    harakat qiladi — bu odatda Pollinations'dan ancha aniq va sifatli
-    natija beradi, va bir xil (bepul) API kalitingiz bilan ishlaydi.
+    Avval hisobingizda mavjud bo'lgan Gemini rasm modelini (Nano Banana)
+    AVTOMATIK topib, shu orqali rasm chizishga harakat qiladi — bu
+    odatda Pollinations'dan ancha aniq va sifatli natija beradi, va bir
+    xil (bepul) API kalitingiz bilan ishlaydi.
 
-    Agar biror sababga ko'ra (masalan kvota tugagan, model nomi
-    o'zgargan) bu ishlamasa, avtomatik ravishda Pollinations.ai'ga
+    Agar biror sababga ko'ra (masalan kvota tugagan, mos model
+    topilmagan) bu ishlamasa, avtomatik ravishda Pollinations.ai'ga
     (URL asosida) qaytadi — shunda tizim baribir ishlashda davom etadi.
 
     Natija: {"image_bytes": bytes} (Gemini muvaffaqiyatli bo'lsa)
@@ -160,8 +197,10 @@ def _generate_image(description: str) -> dict:
     )
     full_prompt = f"{description}, {style}"
 
+    model_name = _discover_image_model() or IMAGE_MODEL
+
     try:
-        model = genai.GenerativeModel(IMAGE_MODEL)
+        model = genai.GenerativeModel(model_name)
         response = model.generate_content(full_prompt)
         for part in response.candidates[0].content.parts:
             inline_data = getattr(part, "inline_data", None)
@@ -171,7 +210,7 @@ def _generate_image(description: str) -> dict:
                 # mumkin — bu holatni ham xavfsiz qayta ishlaymiz.
                 if isinstance(raw_data, str):
                     raw_data = base64.b64decode(raw_data)
-                print("✅ Rasm Gemini (Nano Banana) orqali generatsiya qilindi.")
+                print(f"✅ Rasm '{model_name}' modeli orqali generatsiya qilindi.")
                 return {"image_bytes": raw_data}
         raise RuntimeError("Gemini javobida rasm topilmadi")
     except Exception as e:
