@@ -11,6 +11,26 @@ Bu yerda 'requests' kutubxonasidan foydalaniladi (juda sodda va yengil).
 import requests
 
 CAPTION_LIMIT = 1024
+MESSAGE_LIMIT = 4096
+
+
+def _send_long_text(base_url: str, channel_id: str, text: str):
+    """
+    Telegram xabarlar uchun 4096 belgidan uzun matnni avtomatik ravishda
+    bir nechta xabarga bo'lib yuboradi (aks holda Telegram butunlay rad
+    etadi yoki kesib tashlaydi).
+    """
+    for i in range(0, len(text), MESSAGE_LIMIT):
+        chunk = text[i:i + MESSAGE_LIMIT]
+        response = requests.post(
+            f"{base_url}/sendMessage",
+            data={"chat_id": channel_id, "text": chunk},
+            timeout=30,
+        )
+        if not response.ok:
+            print(f"DEBUG: Telegram javobi: {response.text}")
+        response.raise_for_status()
+    return response
 
 
 def post_content(bot_token: str, channel_id: str, post: dict):
@@ -38,22 +58,4 @@ def post_content(bot_token: str, channel_id: str, post: dict):
     else:
         # Avval rasmni yuboramiz
         response = requests.post(
-            f"{base_url}/sendPhoto",
-            data={"chat_id": channel_id, "photo": post["image_url"]},
-            timeout=30,
-        )
-        if not response.ok:
-            print(f"DEBUG: Telegram javobi: {response.text}")
-        response.raise_for_status()
-        # Keyin to'liq matnni alohida xabar sifatida yuboramiz
-        response = requests.post(
-            f"{base_url}/sendMessage",
-            data={"chat_id": channel_id, "text": post["text"]},
-            timeout=30,
-        )
-
-    if not response.ok:
-        print(f"DEBUG: Telegram javobi: {response.text}")
-    response.raise_for_status()
-    print(f"✅ {post['type']} posti muvaffaqiyatli yuborildi.")
-    return response.json()
+            f"{base_url}
