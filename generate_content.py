@@ -15,6 +15,7 @@ Ishlatilishi:
 import sys
 import os
 import json
+import base64
 
 from content_generator import (
     generate_vocabulary_post,
@@ -36,9 +37,18 @@ def write_summary(post: dict):
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not summary_path:
         return
+
+    if "image_bytes" in post:
+        # Rasmni to'g'ridan-to'g'ri Summary sahifasida ko'rsatish uchun
+        # base64 formatga o'giramiz (alohida fayl/havola shart emas)
+        b64 = base64.b64encode(post["image_bytes"]).decode("ascii")
+        image_markdown = f"![illustration](data:image/png;base64,{b64})"
+    else:
+        image_markdown = f"![illustration]({post['image_url']})"
+
     with open(summary_path, "a", encoding="utf-8") as f:
         f.write(f"# 🔎 Tasdiqlashdan oldin ko'rib chiqing: {post['type']}\n\n")
-        f.write(f"![illustration]({post['image_url']})\n\n")
+        f.write(image_markdown + "\n\n")
         f.write("```\n")
         f.write(post["text"])
         f.write("\n```\n\n")
@@ -59,9 +69,17 @@ if __name__ == "__main__":
 
     post = GENERATORS[content_type]()
 
+    # JSON bayt (bytes) turini saqlay olmaydi, shuning uchun rasmni
+    # base64 matn ko'rinishiga o'girib saqlaymiz.
+    json_safe_post = {"type": post["type"], "text": post["text"]}
+    if "image_bytes" in post:
+        json_safe_post["image_bytes_b64"] = base64.b64encode(post["image_bytes"]).decode("ascii")
+    else:
+        json_safe_post["image_url"] = post["image_url"]
+
     # Keyingi bosqich (publish_content.py) o'qishi uchun saqlaymiz
     with open("content.json", "w", encoding="utf-8") as f:
-        json.dump(post, f, ensure_ascii=False, indent=2)
+        json.dump(json_safe_post, f, ensure_ascii=False, indent=2)
 
     write_summary(post)
     print(f"✅ {post['type']} kontenti generatsiya qilindi va tekshirishga tayyor.")
