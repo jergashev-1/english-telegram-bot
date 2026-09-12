@@ -23,6 +23,7 @@ Har bir funksiya endi dict qaytaradi:
 """
 
 import os
+import re
 import random
 import urllib.parse
 import google.generativeai as genai
@@ -75,6 +76,18 @@ def _ask_gemini(prompt: str, max_tokens: int = 800) -> str:
         generation_config=genai.types.GenerationConfig(max_output_tokens=max_tokens),
     )
     return response.text.strip()
+
+
+def _extract_first_bold(text: str) -> str | None:
+    """
+    Generatsiya qilingan matndan BIRINCHI **qalin** qilingan so'z yoki
+    idiomani ajratib oladi (masalan birinchi vocabulary so'zi yoki
+    birinchi idioma). Bu rasmni aniq, mavzuga mos qilish uchun ishlatiladi.
+    """
+    match = re.search(r"\*\*(.+?)\*\*", text)
+    if match:
+        return match.group(1).strip()
+    return None
 
 
 def _build_image_url(description: str) -> str:
@@ -171,10 +184,12 @@ Postni Telegram formatida yozing (emoji o'rinli ishlatilsin).
 Faqat post matnini yozing, boshqa izoh bermang.
 """
     text = _ask_gemini(prompt, max_tokens=2200)
+    keyword = _extract_first_bold(text) or theme
     image_url = _build_image_url(
-        f"A vivid, realistic scene clearly depicting the everyday theme of "
-        f"'{theme}', with recognizable objects and people related to this "
-        f"topic, warm lighting, magazine-quality photo-illustration"
+        f"A vivid, realistic scene clearly depicting the concept of "
+        f"'{keyword}' (related to the theme of {theme}), with "
+        f"recognizable objects and people directly illustrating this "
+        f"exact word, warm lighting, magazine-quality photo-illustration"
     )
     return {"type": "VOCABULARY", "text": text, "image_url": image_url}
 
@@ -212,10 +227,12 @@ Postni Telegram formatida yozing (emoji o'rinli ishlatilsin).
 Faqat post matnini yozing, boshqa izoh bermang.
 """
     text = _ask_gemini(prompt, max_tokens=2200)
+    idiom = _extract_first_bold(text) or theme
     image_url = _build_image_url(
-        f"A creative, literal visual metaphor artwork illustrating the "
-        f"theme of '{theme}' in a fun, storybook illustration style, "
-        f"whimsical and imaginative scene"
+        f"A creative, LITERAL visual depiction of the English idiom "
+        f"'{idiom}' — draw exactly what the words describe, in a fun "
+        f"storybook illustration style, whimsical and imaginative scene "
+        f"that visually explains the idiom's literal meaning"
     )
     return {"type": "IDIOMS", "text": text, "image_url": image_url}
 
