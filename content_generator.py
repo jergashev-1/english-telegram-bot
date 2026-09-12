@@ -74,7 +74,16 @@ def _ask_gemini(prompt: str, max_tokens: int = 800) -> str:
         prompt,
         generation_config=genai.types.GenerationConfig(max_output_tokens=max_tokens),
     )
-    return response.text.strip()
+    return _clean_text(response.text.strip())
+
+
+def _clean_text(text: str) -> str:
+    """
+    Gemini ba'zan Markdown belgilaridan (**qalin**) foydalanadi, lekin biz
+    Telegram'ga oddiy matn sifatida yuborayotganimiz uchun bu belgilar
+    ekranda '**so'z**' ko'rinishida chiqib qoladi. Ularni olib tashlaymiz.
+    """
+    return text.replace("**", "").replace("__", "")
 
 
 def _build_image_url(description: str) -> str:
@@ -123,7 +132,7 @@ Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
 Postni Telegram formatida yozing (emoji ishlatilsin, lekin oshirib
 yubormang). Faqat post matnini yozing, boshqa izoh bermang.
 """
-    text = _ask_gemini(prompt, max_tokens=1200)
+    text = _ask_gemini(prompt, max_tokens=2200)
     image_url = _build_image_url(
         f"illustration representing the English grammar concept '{topic}', "
         f"classroom diagram style, arrows and simple icons"
@@ -163,7 +172,7 @@ Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
 Postni Telegram formatida yozing (emoji o'rinli ishlatilsin).
 Faqat post matnini yozing, boshqa izoh bermang.
 """
-    text = _ask_gemini(prompt, max_tokens=1200)
+    text = _ask_gemini(prompt, max_tokens=2200)
     image_url = _build_image_url(
         f"illustration representing the theme '{theme}', friendly educational "
         f"scene with simple objects related to the topic"
@@ -203,7 +212,7 @@ Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
 Postni Telegram formatida yozing (emoji o'rinli ishlatilsin).
 Faqat post matnini yozing, boshqa izoh bermang.
 """
-    text = _ask_gemini(prompt, max_tokens=1200)
+    text = _ask_gemini(prompt, max_tokens=2200)
     image_url = _build_image_url(
         f"illustration visually representing the concept of '{theme}', "
         f"playful and metaphorical scene, idiom concept art"
@@ -237,7 +246,7 @@ Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]
 
 Faqat post matnini yozing, boshqa izoh bermang.
 """
-    text = _ask_gemini(prompt, max_tokens=1200)
+    text = _ask_gemini(prompt, max_tokens=2200)
     image_url = _build_image_url(
         "illustration of an open book with a magnifying glass, reading "
         "comprehension concept, cozy study scene"
