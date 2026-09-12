@@ -5,12 +5,14 @@ Bu modul Google Gemini API (BEPUL reja) yordamida kunlik ingliz tili
 kontentini (grammar, vocabulary, idioms, reading test) va har biriga mos
 ILLUSTRATSIYA (rasm) ni avtomatik generatsiya qiladi.
 
-MATN UCHUN — Google Gemini API (BEPUL):
+MATN VA RASM UCHUN — Google Gemini API (BEPUL, bir xil kalit):
     pip install google-generativeai
     Bepul kalit: https://aistudio.google.com/apikey (kredit karta shart emas)
+    Matn uchun: gemini-3.6-flash
+    Rasm uchun: gemini-2.5-flash-image ("Nano Banana")
 
-RASM UCHUN — Pollinations.ai (BUTUNLAY BEPUL, kalit shart emas):
-    Hech qanday ro'yxatdan o'tish, hech qanday API kalit kerak emas.
+ZAXIRA RASM MANBAI — Pollinations.ai (agar Gemini rasm modeli
+ishlamay qolsa, avtomatik shunga o'tiladi):
     Rasmiy sayt: https://pollinations.ai
 
 ANIQ RASM UCHUN YONDASHUV:
@@ -25,12 +27,15 @@ Har bir funksiya endi dict qaytaradi:
     {
         "type": "GRAMMAR" / "VOCABULARY" / "IDIOMS" / "READING",
         "text": "...",          # Telegram posti matni (IMAGE_SCENE qatorisiz)
-        "image_url": "...",     # to'g'ridan-to'g'ri Telegram'ga yuborsa bo'ladigan rasm havolasi
+        "image_bytes": b"...",  # Gemini orqali generatsiya qilingan rasm (asosiy holat)
+        # YOKI
+        "image_url": "...",     # Pollinations orqali (faqat fallback holatida)
     }
 """
 
 import os
 import re
+import base64
 import random
 import urllib.parse
 import google.generativeai as genai
@@ -40,6 +45,7 @@ import google.generativeai as genai
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 MODEL = "gemini-3.6-flash"
+IMAGE_MODEL = "gemini-2.5-flash-image"
 
 # Har kuni turli mavzular chiqishi uchun oddiy ro'yxat
 GRAMMAR_TOPICS = [
@@ -117,8 +123,9 @@ def _extract_scene(text: str) -> tuple[str, str | None]:
 
 def _build_image_url(description: str) -> str:
     """
-    Pollinations.ai orqali BEPUL rasm havolasini quradi.
-    model=flux — Pollinations'ning yuqori sifatli rasm modeli.
+    ZAXIRA (fallback) variant: Pollinations.ai orqali BEPUL rasm havolasini
+    quradi. Bu FAQAT agar Gemini'ning o'z rasm modeli ishlamay qolsa
+    ishlatiladi (masalan kvota tugasa yoki model nomi o'zgargan bo'lsa).
     """
     style = (
         "professional digital illustration, highly detailed, vibrant "
@@ -131,6 +138,45 @@ def _build_image_url(description: str) -> str:
         f"https://image.pollinations.ai/prompt/{encoded}"
         f"?width=1200&height=800&nologo=true&model=flux&enhance=true&seed={random.randint(1, 999999)}"
     )
+
+
+def _generate_image(description: str) -> dict:
+    """
+    Avval Gemini'ning o'z rasm modeli (Nano Banana) orqali rasm chizishga
+    harakat qiladi — bu odatda Pollinations'dan ancha aniq va sifatli
+    natija beradi, va bir xil (bepul) API kalitingiz bilan ishlaydi.
+
+    Agar biror sababga ko'ra (masalan kvota tugagan, model nomi
+    o'zgargan) bu ishlamasa, avtomatik ravishda Pollinations.ai'ga
+    (URL asosida) qaytadi — shunda tizim baribir ishlashda davom etadi.
+
+    Natija: {"image_bytes": bytes} (Gemini muvaffaqiyatli bo'lsa)
+            yoki {"image_url": str} (fallback holatida)
+    """
+    style = (
+        "professional digital illustration, highly detailed, vibrant "
+        "colors, sharp focus, high quality, clean composition, "
+        "no text, no words, no letters, no signature"
+    )
+    full_prompt = f"{description}, {style}"
+
+    try:
+        model = genai.GenerativeModel(IMAGE_MODEL)
+        response = model.generate_content(full_prompt)
+        for part in response.candidates[0].content.parts:
+            inline_data = getattr(part, "inline_data", None)
+            if inline_data is not None and inline_data.data:
+                raw_data = inline_data.data
+                # Ba'zida SDK ma'lumotni base64 matn sifatida qaytarishi
+                # mumkin — bu holatni ham xavfsiz qayta ishlaymiz.
+                if isinstance(raw_data, str):
+                    raw_data = base64.b64decode(raw_data)
+                print("✅ Rasm Gemini (Nano Banana) orqali generatsiya qilindi.")
+                return {"image_bytes": raw_data}
+        raise RuntimeError("Gemini javobida rasm topilmadi")
+    except Exception as e:
+        print(f"⚠️ Gemini rasm generatsiyasi ishlamadi ({e}), Pollinations'ga o'tilmoqda...")
+        return {"image_url": _build_image_url(description)}
 
 
 def generate_grammar_post() -> dict:
@@ -166,8 +212,8 @@ yubormang). Faqat post matnini yozing, boshqa izoh bermang.
 """
     raw = _ask_gemini(prompt, max_tokens=2200)
     text, scene = _extract_scene(raw)
-    image_url = _build_image_url(scene or f"a scene literally illustrating '{topic}'")
-    return {"type": "GRAMMAR", "text": text, "image_url": image_url}
+    image_result = _generate_image(scene or f"a scene literally illustrating '{topic}'")
+    return {"type": "GRAMMAR", "text": text, **image_result}
 
 
 def generate_vocabulary_post() -> dict:
@@ -205,8 +251,8 @@ Faqat post matnini yozing, boshqa izoh bermang.
 """
     raw = _ask_gemini(prompt, max_tokens=2200)
     text, scene = _extract_scene(raw)
-    image_url = _build_image_url(scene or f"a scene about the theme '{theme}'")
-    return {"type": "VOCABULARY", "text": text, "image_url": image_url}
+    image_result = _generate_image(scene or f"a scene about the theme '{theme}'")
+    return {"type": "VOCABULARY", "text": text, **image_result}
 
 
 def generate_idiom_post() -> dict:
@@ -244,8 +290,8 @@ Faqat post matnini yozing, boshqa izoh bermang.
 """
     raw = _ask_gemini(prompt, max_tokens=2200)
     text, scene = _extract_scene(raw)
-    image_url = _build_image_url(scene or f"a literal depiction of {theme}")
-    return {"type": "IDIOMS", "text": text, "image_url": image_url}
+    image_result = _generate_image(scene or f"a literal depiction of {theme}")
+    return {"type": "IDIOMS", "text": text, **image_result}
 
 
 def generate_reading_test() -> dict:
@@ -277,8 +323,8 @@ Faqat post matnini yozing, boshqa izoh bermang.
 """
     raw = _ask_gemini(prompt, max_tokens=2200)
     text, scene = _extract_scene(raw)
-    image_url = _build_image_url(scene or "a cozy reading scene")
-    return {"type": "READING", "text": text, "image_url": image_url}
+    image_result = _generate_image(scene or "a cozy reading scene")
+    return {"type": "READING", "text": text, **image_result}
 
 
 def generate_daily_greeting(day_name: str) -> dict:
@@ -299,11 +345,11 @@ start the same way. Include 1-2 relevant emojis. Keep it under 200
 characters. Output ONLY the greeting message, nothing else.
 """
     text = _ask_gemini(prompt)
-    image_url = _build_image_url(
+    image_result = _generate_image(
         f"A beautiful, realistic photo-illustration capturing the mood of "
         f"{theme}, warm and inviting morning atmosphere, high quality"
     )
-    return {"type": "GREETING", "text": text, "image_url": image_url}
+    return {"type": "GREETING", "text": text, **image_result}
 
 
 # Test qilish uchun (to'g'ridan-to'g'ri ishga tushirilsa)
@@ -317,10 +363,16 @@ if __name__ == "__main__":
         result = generator()
         print(f"=== {result['type']} ===")
         print(result["text"])
-        print("IMAGE:", result["image_url"])
+        if "image_bytes" in result:
+            print(f"IMAGE: {len(result['image_bytes'])} bayt (Gemini)")
+        else:
+            print("IMAGE (fallback URL):", result["image_url"])
         print()
 
     greeting = generate_daily_greeting("Monday")
     print("=== GREETING (Monday) ===")
     print(greeting["text"])
-    print("IMAGE:", greeting["image_url"])
+    if "image_bytes" in greeting:
+        print(f"IMAGE: {len(greeting['image_bytes'])} bayt (Gemini)")
+    else:
+        print("IMAGE (fallback URL):", greeting["image_url"])
