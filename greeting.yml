@@ -1,0 +1,29 @@
+name: Daily Greeting
+
+on:
+  schedule:
+    # 07:00 Toshkent vaqti = 02:00 UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:  # Qo'lda ham ishga tushirish imkonini beradi (test uchun)
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodni yuklab olish
+        uses: actions/checkout@v4
+
+      - name: Python o'rnatish
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Kutubxonalarni o'rnatish
+        run: pip install -r requirements.txt
+
+      - name: Salomlashish postini yuborish
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: python post_greeting.py

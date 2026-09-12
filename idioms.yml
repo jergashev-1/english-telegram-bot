@@ -1,0 +1,46 @@
+name: Idioms Post
+
+on:
+  schedule:
+    # 15:00 Toshkent vaqti = 10:00 UTC
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Kontentni generatsiya qilish
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python generate_content.py idioms
+      - name: Natijani saqlash (keyingi bosqich uchun)
+        uses: actions/upload-artifact@v4
+        with:
+          name: content
+          path: content.json
+
+  publish:
+    needs: generate
+    runs-on: ubuntu-latest
+    environment: production   # <-- SHU YERDA tasdiqlash talab qilinadi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Generatsiya qilingan kontentni olish
+        uses: actions/download-artifact@v4
+        with:
+          name: content
+      - name: Kanalga yuborish
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: python publish_content.py
