@@ -74,16 +74,7 @@ def _ask_gemini(prompt: str, max_tokens: int = 800) -> str:
         prompt,
         generation_config=genai.types.GenerationConfig(max_output_tokens=max_tokens),
     )
-    return _clean_text(response.text.strip())
-
-
-def _clean_text(text: str) -> str:
-    """
-    Gemini ba'zan Markdown belgilaridan (**qalin**) foydalanadi, lekin biz
-    Telegram'ga oddiy matn sifatida yuborayotganimiz uchun bu belgilar
-    ekranda '**so'z**' ko'rinishida chiqib qoladi. Ularni olib tashlaymiz.
-    """
-    return text.replace("**", "").replace("__", "")
+    return response.text.strip()
 
 
 def _build_image_url(description: str) -> str:
@@ -91,15 +82,21 @@ def _build_image_url(description: str) -> str:
     Pollinations.ai orqali BEPUL rasm havolasini quradi.
     Bu havola to'g'ridan-to'g'ri Telegram'ning send_photo funksiyasiga
     berilishi mumkin — rasmni oldindan yuklab olish shart emas.
+
+    model=flux — Pollinations'ning yuqori sifatli rasm modeli (standart
+    "turbo" modelidan ancha aniq va sifatli natija beradi).
     """
     style = (
-        "simple flat vector illustration, minimalist educational icon, "
-        "clean pastel colors, white background, no text, no words, no letters"
+        "professional digital illustration, highly detailed, vibrant "
+        "colors, sharp focus, high quality, clean composition, "
+        "no text, no words, no letters, no signature"
     )
     full_prompt = f"{description}, {style}"
     encoded = urllib.parse.quote(full_prompt)
-    # width/height — Telegram uchun mos o'lcham; nologo — suv belgisiz variant
-    return f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=768&nologo=true"
+    return (
+        f"https://image.pollinations.ai/prompt/{encoded}"
+        f"?width=1200&height=800&nologo=true&model=flux&enhance=true&seed={random.randint(1, 999999)}"
+    )
 
 
 def generate_grammar_post() -> dict:
@@ -134,8 +131,9 @@ yubormang). Faqat post matnini yozing, boshqa izoh bermang.
 """
     text = _ask_gemini(prompt, max_tokens=2200)
     image_url = _build_image_url(
-        f"illustration representing the English grammar concept '{topic}', "
-        f"classroom diagram style, arrows and simple icons"
+        f"A clear educational illustration explaining the English grammar "
+        f"topic '{topic}', showing a classroom whiteboard or diagram with "
+        f"arrows connecting example sentences, teacher-style visual"
     )
     return {"type": "GRAMMAR", "text": text, "image_url": image_url}
 
@@ -174,8 +172,9 @@ Faqat post matnini yozing, boshqa izoh bermang.
 """
     text = _ask_gemini(prompt, max_tokens=2200)
     image_url = _build_image_url(
-        f"illustration representing the theme '{theme}', friendly educational "
-        f"scene with simple objects related to the topic"
+        f"A vivid, realistic scene clearly depicting the everyday theme of "
+        f"'{theme}', with recognizable objects and people related to this "
+        f"topic, warm lighting, magazine-quality photo-illustration"
     )
     return {"type": "VOCABULARY", "text": text, "image_url": image_url}
 
@@ -214,8 +213,9 @@ Faqat post matnini yozing, boshqa izoh bermang.
 """
     text = _ask_gemini(prompt, max_tokens=2200)
     image_url = _build_image_url(
-        f"illustration visually representing the concept of '{theme}', "
-        f"playful and metaphorical scene, idiom concept art"
+        f"A creative, literal visual metaphor artwork illustrating the "
+        f"theme of '{theme}' in a fun, storybook illustration style, "
+        f"whimsical and imaginative scene"
     )
     return {"type": "IDIOMS", "text": text, "image_url": image_url}
 
@@ -248,8 +248,9 @@ Faqat post matnini yozing, boshqa izoh bermang.
 """
     text = _ask_gemini(prompt, max_tokens=2200)
     image_url = _build_image_url(
-        "illustration of an open book with a magnifying glass, reading "
-        "comprehension concept, cozy study scene"
+        "A cozy, realistic photo-illustration of a person reading an open "
+        "book in a quiet library or study corner, warm ambient lighting, "
+        "detailed and inviting"
     )
     return {"type": "READING", "text": text, "image_url": image_url}
 
@@ -273,7 +274,8 @@ characters. Output ONLY the greeting message, nothing else.
 """
     text = _ask_gemini(prompt)
     image_url = _build_image_url(
-        f"a warm, cheerful morning scene, {theme}, greeting card style"
+        f"A beautiful, realistic photo-illustration capturing the mood of "
+        f"{theme}, warm and inviting morning atmosphere, high quality"
     )
     return {"type": "GREETING", "text": text, "image_url": image_url}
 
