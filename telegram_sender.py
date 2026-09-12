@@ -16,23 +16,34 @@ CAPTION_LIMIT = 1024
 MESSAGE_LIMIT = 4096
 
 
-def _markdown_bold_to_html(text: str) -> str:
+def _pairs_to_tag(text: str, delimiter: str, tag: str) -> str:
     """
-    Gemini matnda **so'z** (Markdown qalin) formatidan foydalanadi.
-    Buni Telegram HTML formatiga (<b>so'z</b>) o'giramiz — natijada
-    so'z HAQIQATAN QALIN (bold) ko'rinishda chiqadi.
+    Matndagi juft belgilar orasidagi qismni berilgan HTML teg bilan
+    o'raydi (masalan **so'z** -> <b>so'z</b>, yoki ||javob|| -> spoiler).
     """
-    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    if text.count(delimiter) % 2 == 1:
+        idx = text.rfind(delimiter)
+        text = text[:idx] + text[idx + len(delimiter):]
 
-    if text.count("**") % 2 == 1:
-        idx = text.rfind("**")
-        text = text[:idx] + text[idx + 2:]
-
-    parts = text.split("**")
+    parts = text.split(delimiter)
     result = []
     for i, part in enumerate(parts):
-        result.append(f"<b>{part}</b>" if i % 2 == 1 else part)
+        result.append(f"<{tag}>{part}</{tag}>" if i % 2 == 1 else part)
     return "".join(result)
+
+
+def _format_to_html(text: str) -> str:
+    """
+    Gemini matnida ishlatiladigan ikki formatlashni Telegram HTML'ga
+    o'giradi:
+    - **so'z**       -> <b>so'z</b>           (qalin harf)
+    - ||javob matni|| -> <tg-spoiler>...</tg-spoiler>  (bosib ochiladigan,
+      "spoiler" ko'rinish — testning javoblarini yashirish uchun)
+    """
+    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    text = _pairs_to_tag(text, "**", "b")
+    text = _pairs_to_tag(text, "||", "tg-spoiler")
+    return text
 
 
 def _send_long_text(base_url: str, channel_id: str, text: str):
@@ -80,7 +91,7 @@ def post_content(bot_token: str, channel_id: str, post: dict):
     to'liq matnni alohida yuboradi.
     """
     base_url = f"https://api.telegram.org/bot{bot_token}"
-    html_text = _markdown_bold_to_html(post["text"])
+    html_text = _format_to_html(post["text"])
 
     if len(post["text"]) <= CAPTION_LIMIT:
         response = _send_photo(base_url, channel_id, post, caption=html_text)
