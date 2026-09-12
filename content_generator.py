@@ -31,7 +31,7 @@ import google.generativeai as genai
 # Terminal'da o'rnatish: export GEMINI_API_KEY="AIzaSy..."
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-3.6-flash"
 
 # Har kuni turli mavzular chiqishi uchun oddiy ro'yxat
 GRAMMAR_TOPICS = [
