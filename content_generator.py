@@ -334,8 +334,8 @@ Faqat post matnini yozing, boshqa izoh bermang.
 
 
 def generate_reading_test() -> dict:
-    """Reading matni + 4 ta tushunish savoli + mos illustratsiya generatsiya qiladi."""
-    prompt = f"""
+    """Reading matni + 4 ta tushunish savoli generatsiya qiladi (rasmsiz)."""
+    prompt = """
 Siz ingliz tili o'qituvchisisiz. Telegram kanali uchun qisqa (100-150 so'zli)
 reading matni yozing (intermediate daraja), so'ngra AYNAN o'sha matn
 asosida 4 ta tushunish savoli (multiple choice, A/B/C variantlari bilan)
@@ -358,12 +358,9 @@ qo'shing. Tuzilma:
 ||Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]||
 
 Faqat post matnini yozing, boshqa izoh bermang.
-{_IMAGE_SCENE_INSTRUCTION}
 """
-    raw = _ask_gemini(prompt, max_tokens=2200)
-    text, scene = _extract_scene(raw)
-    image_result = _generate_image(scene or "a cozy reading scene")
-    return {"type": "READING", "text": text, **image_result}
+    text = _ask_gemini(prompt, max_tokens=2200)
+    return {"type": "READING", "text": text}
 
 
 def generate_daily_greeting(day_name: str) -> dict:
