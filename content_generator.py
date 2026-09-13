@@ -371,12 +371,27 @@ READING_TOPICS = [
 ]
 
 
-def generate_reading_test() -> dict:
+READING_HEADING_TOPICS = [
+    "Buses", "Bees", "Coffee", "Chocolate", "The Internet", "Recycling",
+    "Photography", "Bicycles", "Volcanoes", "The Great Wall of China",
+    "Sleep", "Vitamins", "Solar Energy", "Robots", "Space Exploration",
+    "Ancient Egypt", "The Amazon Rainforest", "Coral Reefs", "Electric Cars",
+    "3D Printing", "Video Games", "The History of Money", "Libraries",
+    "Bridges", "Skyscrapers", "Airplanes", "Trains", "The Olympic Games",
+    "Yoga", "Meditation", "Street Art", "Museums", "National Parks",
+    "Endangered Animals", "Plastic Pollution", "Renewable Energy",
+    "Artificial Intelligence", "Smartphones", "Social Media Platforms",
+    "Ancient Rome", "The Vikings", "Pyramids", "Deserts",
+    "Icebergs and Glaciers", "Bird Migration", "Dolphins and Whales",
+    "The Human Brain", "Dreams", "Handwriting vs Typing", "Board Games",
+]
+
+
+def _generate_reading_gapfill() -> str:
     """
-    Reading uchun 'gap-fill' (bo'sh joylarni to'ldirish) mashqi
-    generatsiya qiladi (rasmsiz). Har bir bo'sh joy uchun javob —
-    matnning BOSHQA qismida allaqachon ishlatilgan so'z bo'lishi kerak
-    (ya'ni javoblarni matnning o'zidan topish mumkin).
+    'Gap-fill' (bo'sh joylarni to'ldirish) mashqi. Har bir bo'sh joy
+    uchun javob — matnning BOSHQA qismida allaqachon ishlatilgan so'z
+    bo'lishi kerak.
     """
     topic = random.choice(READING_TOPICS)
     prompt = f"""
@@ -408,7 +423,80 @@ which is somewhere else in the text.
 
 Faqat post matnini yozing, boshqa izoh bermang.
 """
-    text = _ask_gemini(prompt, max_tokens=2200)
+    return _ask_gemini(prompt, max_tokens=2200)
+
+
+def _generate_reading_heading_matching() -> str:
+    """
+    'Paragraf sarlavhasini moslashtirish' mashqi (Multilevel Reading
+    uslubida). 6 ta qisqa paragraf + 8 ta sarlavha varianti (2 tasi
+    "aldash" uchun ortiqcha) beriladi, o'quvchi har bir paragrafga mos
+    sarlavhani topishi kerak.
+    """
+    topic = random.choice(READING_HEADING_TOPICS)
+    prompt = f"""
+Siz ingliz tili o'qituvchisisiz. "{topic}" mavzusida ma'lumot beruvchi
+(informational) matn tuzing. Matn 6 ta QISQA paragrafdan iborat bo'lsin
+(har biri 40-60 so'z), har bir paragraf shu mavzuning BOSHQA-BOSHQA
+jihatini yoritsin (masalan: tarixi, qanday ishlashi, foydasi, qiziqarli
+faktlar, muammolari, kelajagi kabi — mavzuga moslab tanlang).
+
+Tuzilma AYNAN quyidagicha bo'lsin:
+
+📝 READING TEST (Multilevel — Matching Headings)
+
+Read the text and choose the correct heading for each paragraph from
+the list of headings below. There are more headings than paragraphs,
+so you will not use all of them. You cannot use any heading more than
+once.
+
+List of Headings:
+A) [sarlavha]
+B) [sarlavha]
+C) [sarlavha]
+D) [sarlavha]
+E) [sarlavha]
+F) [sarlavha]
+G) [sarlavha]
+H) [sarlavha]
+
+(8 ta sarlavha bo'lishi SHART — 6 tasi paragraflarga mos, 2 tasi esa
+ataylab MOS KELMAYDIGAN "aldash" sarlavha bo'lsin)
+
+Paragraph 1 ...
+Paragraph 2 ...
+Paragraph 3 ...
+Paragraph 4 ...
+Paragraph 5 ...
+Paragraph 6 ...
+
+[Matn sarlavhasi]
+
+1. [40-60 so'zli paragraf matni]
+2. [40-60 so'zli paragraf matni]
+3. [40-60 so'zli paragraf matni]
+4. [40-60 so'zli paragraf matni]
+5. [40-60 so'zli paragraf matni]
+6. [40-60 so'zli paragraf matni]
+
+||Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf], 5-[harf], 6-[harf]||
+
+Faqat post matnini yozing, boshqa izoh bermang.
+"""
+    return _ask_gemini(prompt, max_tokens=2600)
+
+
+def generate_reading_test() -> dict:
+    """
+    Reading mashqini generatsiya qiladi (rasmsiz). Ikkita format orasida
+    tasodifiy tanlanadi — xilma-xillik uchun:
+    1. Gap-fill (bo'sh joylarni to'ldirish)
+    2. Paragraf sarlavhasini moslashtirish (Multilevel Reading uslubida)
+    """
+    if random.random() < 0.5:
+        text = _generate_reading_gapfill()
+    else:
+        text = _generate_reading_heading_matching()
     return {"type": "READING", "text": text}
 
 
@@ -450,8 +538,10 @@ if __name__ == "__main__":
         print(result["text"])
         if "image_bytes" in result:
             print(f"IMAGE: {len(result['image_bytes'])} bayt (Gemini)")
-        else:
+        elif "image_url" in result:
             print("IMAGE (fallback URL):", result["image_url"])
+        else:
+            print("IMAGE: yo'q (masalan Reading uchun)")
         print()
 
     greeting = generate_daily_greeting("Monday")
