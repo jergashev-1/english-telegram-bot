@@ -50,23 +50,44 @@ IMAGE_MODEL = "gemini-2.5-flash-image"
 # Har kuni turli mavzular chiqishi uchun oddiy ro'yxat
 GRAMMAR_TOPICS = [
     "Present Simple vs Present Continuous",
-    "Past Simple", "Present Perfect", "Future Forms (will vs going to)",
-    "Conditionals (0 and 1st)", "Modal verbs (can, must, should)",
-    "Passive Voice (basic)", "Comparatives and Superlatives",
-    "Articles (a/an/the)", "Prepositions of time and place",
+    "Past Simple", "Present Perfect", "Present Perfect Continuous",
+    "Past Continuous", "Past Perfect", "Future Forms (will vs going to)",
+    "Future Continuous", "Conditionals (0 and 1st)",
+    "Conditionals (2nd and 3rd)", "Mixed Conditionals",
+    "Modal verbs (can, must, should)", "Modal verbs of deduction (must/might/can't)",
+    "Passive Voice (basic)", "Passive Voice (advanced)",
+    "Comparatives and Superlatives", "Articles (a/an/the)",
+    "Prepositions of time and place", "Reported Speech (statements)",
+    "Reported Speech (questions)", "Relative Clauses (who/which/that)",
+    "Gerunds vs Infinitives", "Used to vs Would", "Question Tags",
+    "Countable and Uncountable Nouns", "Quantifiers (much/many/a lot of)",
+    "Phrasal Verbs with Get", "Phrasal Verbs with Take",
+    "So vs Such", "Too vs Enough",
 ]
 
 VOCAB_THEMES = [
     "Travel and Transportation", "Food and Cooking", "Work and Office Life",
     "Health and Body", "Technology and Internet", "Emotions and Feelings",
     "Shopping and Money", "Weather and Seasons", "Family and Relationships",
-    "Hobbies and Free Time",
+    "Hobbies and Free Time", "Education and School", "Sports and Exercise",
+    "Environment and Nature", "Housing and Living Spaces", "Clothes and Fashion",
+    "Crime and Law", "Media and News", "Art and Culture",
+    "Science and Discovery", "Music and Entertainment", "Business and Careers",
+    "Social Media and Communication", "Personality Traits", "City Life",
+    "Countryside and Farming", "Holidays and Celebrations",
+    "Cars and Driving", "Medicine and Illness",
 ]
 
 IDIOM_THEMES = [
     "idioms about time", "idioms about money", "idioms about emotions",
     "idioms about success and failure", "idioms about relationships",
     "animal idioms", "food idioms", "weather idioms",
+    "idioms about work", "idioms about health", "idioms about communication",
+    "idioms about problems and difficulties", "idioms about opportunities",
+    "idioms about secrets", "idioms about effort and hard work",
+    "idioms about surprise", "idioms about anger", "idioms about happiness",
+    "body part idioms", "color idioms", "idioms about decisions",
+    "sports idioms used in everyday English", "idioms about luck",
 ]
 
 # Har bir hafta kuni uchun boshqacha kayfiyat/mavzu — rasm va matnga xilma-xillik beradi
@@ -333,29 +354,57 @@ Faqat post matnini yozing, boshqa izoh bermang.
     return {"type": "IDIOMS", "text": text, **image_result}
 
 
+READING_TOPICS = [
+    "free time and hobbies", "university student life", "working from home",
+    "healthy eating habits", "travel experiences", "learning a new language",
+    "social media and technology", "environmental protection",
+    "sports and fitness", "friendship and relationships",
+    "family traditions", "moving to a new city", "starting a new job",
+    "cooking and favorite foods", "reading books", "music and concerts",
+    "pets and animals", "weekend routines", "childhood memories",
+    "online shopping", "public transportation", "seasons and weather",
+    "part-time jobs for students", "volunteering", "photography as a hobby",
+    "dealing with stress", "sleep habits", "morning routines",
+    "learning to drive", "living with roommates", "planning a vacation",
+    "using smartphones too much", "trying a new hobby",
+    "differences between city and village life",
+]
+
+
 def generate_reading_test() -> dict:
-    """Reading matni + 4 ta tushunish savoli generatsiya qiladi (rasmsiz)."""
-    prompt = """
-Siz ingliz tili o'qituvchisisiz. Telegram kanali uchun qisqa (100-150 so'zli)
-reading matni yozing (intermediate daraja), so'ngra AYNAN o'sha matn
-asosida 4 ta tushunish savoli (multiple choice, A/B/C variantlari bilan)
-qo'shing. Tuzilma:
+    """
+    Reading uchun 'gap-fill' (bo'sh joylarni to'ldirish) mashqi
+    generatsiya qiladi (rasmsiz). Har bir bo'sh joy uchun javob —
+    matnning BOSHQA qismida allaqachon ishlatilgan so'z bo'lishi kerak
+    (ya'ni javoblarni matnning o'zidan topish mumkin).
+    """
+    topic = random.choice(READING_TOPICS)
+    prompt = f"""
+Siz ingliz tili o'qituvchisisiz. Telegram kanali uchun "{topic}" mavzusida,
+birinchi shaxs tilida (I, my) yozilgan, tabiiy va qiziqarli qisqa matn
+(120-160 so'z, intermediate daraja) yozing.
+
+MUHIM QOIDA: Matnda 6 ta bo'sh joy (gap) bo'lishi kerak, quyidagi
+formatda: (1)__________, (2)__________ va h.k. Har bir bo'sh joy uchun
+to'g'ri javob — bitta so'z bo'lishi SHART, va bu so'z MATNNING BOSHQA
+BIR JOYIDA ALLAQACHON ishlatilgan bo'lishi kerak (ya'ni o'quvchi javobni
+matnning o'zidan topib, ko'chirib yozishi mumkin). Masalan, agar matnda
+biror joyda "gym" so'zi ishlatilgan bo'lsa, boshqa bir bo'sh joy javobi
+ham "gym" bo'lishi mumkin.
+
+Tuzilma AYNAN quyidagicha bo'lsin:
 
 📝 READING TEST
 
-[Matn]
+Read the text. Fill in each gap with ONE word. You must use a word
+which is somewhere else in the text.
 
-🧪 Savollar:
-1. [savol matni]
-   A) ... B) ... C) ...
-2. [savol matni]
-   A) ... B) ... C) ...
-3. [savol matni]
-   A) ... B) ... C) ...
-4. [savol matni]
-   A) ... B) ... C) ...
+[Sarlavha savol shaklida, masalan "What do you do in your free time?"]
 
-||Javoblar: 1-[harf], 2-[harf], 3-[harf], 4-[harf]||
+[120-160 so'zli matn, ichida (1)__________ dan (6)__________ gacha
+6 ta bo'sh joy bilan]
+
+||Javoblar: 1-[so'z], 2-[so'z], 3-[so'z], 4-[so'z], 5-[so'z], 6-[so'z]||
 
 Faqat post matnini yozing, boshqa izoh bermang.
 """
