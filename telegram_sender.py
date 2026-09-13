@@ -85,15 +85,21 @@ def _send_photo(base_url: str, channel_id: str, post: dict, caption: str = None)
 
 def post_content(bot_token: str, channel_id: str, post: dict):
     """
-    Generatsiya qilingan postni (rasm + matn) to'g'ridan-to'g'ri kanalga
-    yuboradi. Matndagi **qalin** belgilar haqiqiy qalin (bold) formatga
-    o'giriladi. Agar matn 1024 belgidan uzun bo'lsa, avval rasmni, keyin
-    to'liq matnni alohida yuboradi.
+    Generatsiya qilingan postni to'g'ridan-to'g'ri kanalga yuboradi.
+    Matndagi **qalin** belgilar haqiqiy qalin (bold) formatga o'giriladi.
+
+    Agar post'da rasm (image_bytes yoki image_url) bo'lmasa — oddiy matn
+    xabari sifatida yuboriladi (masalan Reading Test uchun, unga rasm
+    kerak emas). Rasm bo'lsa, va matn 1024 belgidan uzun bo'lsa, avval
+    rasmni, keyin to'liq matnni alohida yuboradi.
     """
     base_url = f"https://api.telegram.org/bot{bot_token}"
     html_text = _format_to_html(post["text"])
+    has_image = "image_bytes" in post or "image_url" in post
 
-    if len(post["text"]) <= CAPTION_LIMIT:
+    if not has_image:
+        response = _send_long_text(base_url, channel_id, html_text)
+    elif len(post["text"]) <= CAPTION_LIMIT:
         response = _send_photo(base_url, channel_id, post, caption=html_text)
     else:
         response = _send_photo(base_url, channel_id, post)
