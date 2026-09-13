@@ -1,28 +1,34 @@
 """
 scheduler_bot.py
 -----------------
-Bu skript mavjud Telegram botingizga QO'SHIMCHA funksiya sifatida ishlaydi:
-- Kunning turli vaqtlarida grammar / vocabulary / idioms / reading test
-  MATNI VA MOS RASMINI generatsiya qiladi
-- Avval SIZGA (admin) shaxsiy chatga yuboradi, tasdiqlash uchun (rasm + matn)
-- Siz "✅ Tasdiqlash" tugmasini bossangiz — kanalga (rasm + matn) chiqadi
-- "❌ Rad etish" bossangiz — o'sha post chiqmaydi
+Render.com (yoki har qanday doimiy ishlaydigan server) uchun mo'ljallangan
+YAGONA, DOIMIY ishlaydigan skript. Bu skript ichida:
+
+- Kunlik jadval (APScheduler) — belgilangan vaqtlarda avtomatik ishlaydi
+- Tasdiqlash tizimi — grammar/vocab/idioms/reading postlari avval SIZGA
+  (admin) yuboriladi, ✅/❌ tugmalari orqali tasdiqlaysiz
+- Test buyruqlari — istalgan vaqtda /test_vocab kabi buyruqlar bilan
+  darhol sinab ko'rishingiz mumkin
 
 O'RNATISH:
-    pip install python-telegram-bot google-generativeai apscheduler
+    pip install -r requirements.txt
 
-ISHGA TUSHIRISH:
-    export TELEGRAM_BOT_TOKEN="sizning_botfather_tokeningiz"
-    export GEMINI_API_KEY="sizning_bepul_gemini_kalitingiz"
-    export ADMIN_CHAT_ID="sizning_shaxsiy_telegram_id"
-    export CHANNEL_ID="@sizning_kanal_username_yoki_id"
+ISHGA TUSHIRISH (Render'da "Start Command" sifatida):
     python scheduler_bot.py
+
+KERAKLI ENVIRONMENT VARIABLES (Render dashboard'ida "Environment" bo'limida):
+    TELEGRAM_BOT_TOKEN — BotFather'dan olingan token
+    GEMINI_API_KEY     — aistudio.google.com/apikey'dan olingan bepul kalit
+    ADMIN_CHAT_ID       — sizning shaxsiy Telegram ID'ingiz (@userinfobot orqali)
+    CHANNEL_ID          — @sizning_kanalingiz
 """
 
 import os
 import logging
 import datetime
 import zoneinfo
+from io import BytesIO
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -36,6 +42,7 @@ from content_generator import (
     generate_reading_test,
     generate_daily_greeting,
 )
+from telegram_sender import post_content, _format_to_html
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,13 +52,22 @@ ADMIN_CHAT_ID = int(os.environ["ADMIN_CHAT_ID"])
 CHANNEL_ID = os.environ["CHANNEL_ID"]
 TIMEZONE = zoneinfo.ZoneInfo("Asia/Tashkent")
 
-# Tasdiqlanishi kutilayotgan postlarni vaqtincha saqlash uchun
-# Har bir post endi {"text": ..., "image_url": ...} ko'rinishida saqlanadi
+# Tasdiqlanishi kutilayotgan postlarni vaqtincha xotirada saqlash uchun
 pending_posts: dict[str, dict] = {}
 _post_counter = 0
 
-# Telegram caption (rasm ostidagi matn) uzunlik chegarasi
 CAPTION_LIMIT = 1024
+
+
+def _photo_arg(post: dict):
+    """
+    python-telegram-bot'ga rasm sifatida nima berish kerakligini
+    aniqlaydi: agar Gemini orqali bayt (bytes) mavjud bo'lsa — fayl
+    sifatida, aks holda Pollinations havolasi (URL) sifatida.
+    """
+    if "image_bytes" in post:
+        return BytesIO(post["image_bytes"])
+    return post["image_url"]
 
 
 async def _send_for_approval(app: Application, post: dict):
@@ -71,63 +87,53 @@ async def _send_for_approval(app: Application, post: dict):
     header = f"🔔 Yangi {post['type']} posti tayyor (tasdiqlashni kuting):"
     await app.bot.send_message(chat_id=ADMIN_CHAT_ID, text=header)
 
-    # Rasm va matnni ko'rib chiqish uchun yuboramiz
+    html_text = _format_to_html(post["text"])
+    photo = _photo_arg(post)
+
     if len(post["text"]) <= CAPTION_LIMIT:
         await app.bot.send_photo(
             chat_id=ADMIN_CHAT_ID,
-            photo=post["image_url"],
-            caption=post["text"],
+            photo=photo,
+            caption=html_text,
+            parse_mode="HTML",
             reply_markup=keyboard,
         )
     else:
-        # Matn caption chegarasidan uzun bo'lsa, rasm va matnni alohida yuboramiz
-        await app.bot.send_photo(chat_id=ADMIN_CHAT_ID, photo=post["image_url"])
+        await app.bot.send_photo(chat_id=ADMIN_CHAT_ID, photo=photo)
         await app.bot.send_message(
             chat_id=ADMIN_CHAT_ID,
-            text=post["text"],
+            text=html_text,
+            parse_mode="HTML",
             reply_markup=keyboard,
         )
 
 
 async def job_grammar(app: Application):
-    post = generate_grammar_post()
-    await _send_for_approval(app, post)
+    await _send_for_approval(app, generate_grammar_post())
 
 
 async def job_vocabulary(app: Application):
-    post = generate_vocabulary_post()
-    await _send_for_approval(app, post)
+    await _send_for_approval(app, generate_vocabulary_post())
 
 
 async def job_idioms(app: Application):
-    post = generate_idiom_post()
-    await _send_for_approval(app, post)
+    await _send_for_approval(app, generate_idiom_post())
 
 
 async def job_reading(app: Application):
-    post = generate_reading_test()
-    await _send_for_approval(app, post)
+    await _send_for_approval(app, generate_reading_test())
 
 
 async def job_greeting(app: Application):
     """
     Har kuni ertalab 07:00'da ishlaydi. Boshqa postlardan farqli o'laroq,
     BU TO'G'RIDAN-TO'G'RI kanalga chiqadi (tasdiqlashsiz) — chunki oddiy
-    salomlashish xabari xato bo'lish xavfi juda past. Agar buni ham
-    tasdiqlash orqali chiqishini xohlasangiz, pastdagi eslatmaga qarang.
+    salomlashish xabari xato bo'lish xavfi juda past.
     """
     day_name = datetime.datetime.now(TIMEZONE).strftime("%A")
     post = generate_daily_greeting(day_name)
-    await app.bot.send_photo(
-        chat_id=CHANNEL_ID,
-        photo=post["image_url"],
-        caption=post["text"],
-    )
+    post_content(BOT_TOKEN, CHANNEL_ID, post)
     logger.info(f"Kunlik salomlashish yuborildi: {day_name}")
-
-    # AGAR TASDIQLASH ORQALI CHIQISHINI XOHLASANGIZ — yuqoridagi 3 qatorni
-    # o'chirib, o'rniga quyidagini yozing:
-    #     await _send_for_approval(app, post)
 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -139,80 +145,68 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     post = pending_posts.pop(post_id, None)
 
     if post is None:
-        await query.edit_message_caption(caption="⚠️ Bu post allaqachon ko'rib chiqilgan.")
+        try:
+            await query.edit_message_caption(caption="⚠️ Bu post allaqachon ko'rib chiqilgan.")
+        except Exception:
+            await query.edit_message_text("⚠️ Bu post allaqachon ko'rib chiqilgan.")
         return
 
     if action == "approve":
-        if len(post["text"]) <= CAPTION_LIMIT:
-            await context.bot.send_photo(
-                chat_id=CHANNEL_ID,
-                photo=post["image_url"],
-                caption=post["text"],
-            )
-        else:
-            await context.bot.send_photo(chat_id=CHANNEL_ID, photo=post["image_url"])
-            await context.bot.send_message(chat_id=CHANNEL_ID, text=post["text"])
-
-        try:
-            await query.edit_message_caption(caption="✅ Kanalga yuborildi.")
-        except Exception:
-            await query.edit_message_text("✅ Kanalga yuborildi.")
+        post_content(BOT_TOKEN, CHANNEL_ID, post)
+        result_text = "✅ Kanalga yuborildi."
     else:
-        try:
-            await query.edit_message_caption(caption="❌ Bekor qilindi.")
-        except Exception:
-            await query.edit_message_text("❌ Bekor qilindi.")
+        result_text = "❌ Bekor qilindi."
+
+    try:
+        await query.edit_message_caption(caption=result_text)
+    except Exception:
+        await query.edit_message_text(result_text)
 
 
 async def cmd_test_grammar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Qo'lda tekshirish uchun: /test_grammar buyrug'i darhol post generatsiya qiladi."""
     if update.effective_chat.id != ADMIN_CHAT_ID:
         return
-    await update.message.reply_text("Generatsiya qilinmoqda (matn + rasm)...")
+    await update.message.reply_text("Generatsiya qilinmoqda...")
     await job_grammar(context.application)
 
 
 async def cmd_test_vocab(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != ADMIN_CHAT_ID:
         return
-    await update.message.reply_text("Generatsiya qilinmoqda (matn + rasm)...")
+    await update.message.reply_text("Generatsiya qilinmoqda...")
     await job_vocabulary(context.application)
 
 
 async def cmd_test_idioms(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != ADMIN_CHAT_ID:
         return
-    await update.message.reply_text("Generatsiya qilinmoqda (matn + rasm)...")
+    await update.message.reply_text("Generatsiya qilinmoqda...")
     await job_idioms(context.application)
 
 
 async def cmd_test_reading(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id != ADMIN_CHAT_ID:
         return
-    await update.message.reply_text("Generatsiya qilinmoqda (matn + rasm)...")
+    await update.message.reply_text("Generatsiya qilinmoqda...")
     await job_reading(context.application)
 
 
 async def cmd_test_greeting(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Salomlashish namunasini ko'rish uchun — bu FAQAT SIZGA (admin) yuboradi,
-    kanalga CHIQMAYDI. Haqiqiy avtomatik salomlashishni ko'rish uchun
-    ertalab 07:00'ni kuting yoki kanalni tekshiring.
-    """
+    """Namuna ko'rsatadi, lekin kanalga CHIQMAYDI (faqat admin'ga)."""
     if update.effective_chat.id != ADMIN_CHAT_ID:
         return
     day_name = datetime.datetime.now(TIMEZONE).strftime("%A")
     post = generate_daily_greeting(day_name)
     await update.message.reply_photo(
-        photo=post["image_url"],
-        caption=f"👀 NAMUNA (kanalga chiqmadi):\n\n{post['text']}",
+        photo=_photo_arg(post),
+        caption=f"👀 NAMUNA (kanalga chiqmadi):\n\n{_format_to_html(post['text'])}",
+        parse_mode="HTML",
     )
 
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Qo'lda test qilish buyruqlari (mavjud botingizga qo'shimcha sifatida)
     app.add_handler(CommandHandler("test_grammar", cmd_test_grammar))
     app.add_handler(CommandHandler("test_vocab", cmd_test_vocab))
     app.add_handler(CommandHandler("test_idioms", cmd_test_idioms))
@@ -220,7 +214,6 @@ def main():
     app.add_handler(CommandHandler("test_greeting", cmd_test_greeting))
     app.add_handler(CallbackQueryHandler(button_callback))
 
-    # Avtomatik jadval: siz belgilagan qat'iy vaqtlar
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
     scheduler.add_job(job_greeting, "cron", hour=7, minute=0, args=[app])
     scheduler.add_job(job_vocabulary, "cron", hour=9, minute=0, args=[app])
