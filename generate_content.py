@@ -42,13 +42,16 @@ def write_summary(post: dict):
         # Rasmni to'g'ridan-to'g'ri Summary sahifasida ko'rsatish uchun
         # base64 formatga o'giramiz (alohida fayl/havola shart emas)
         b64 = base64.b64encode(post["image_bytes"]).decode("ascii")
-        image_markdown = f"![illustration](data:image/png;base64,{b64})"
+        image_markdown = f"![illustration](data:image/png;base64,{b64})\n\n"
+    elif "image_url" in post:
+        image_markdown = f"![illustration]({post['image_url']})\n\n"
     else:
-        image_markdown = f"![illustration]({post['image_url']})"
+        # Masalan Reading Test — bu turga rasm kerak emas
+        image_markdown = ""
 
     with open(summary_path, "a", encoding="utf-8") as f:
         f.write(f"# 🔎 Tasdiqlashdan oldin ko'rib chiqing: {post['type']}\n\n")
-        f.write(image_markdown + "\n\n")
+        f.write(image_markdown)
         f.write("```\n")
         f.write(post["text"])
         f.write("\n```\n\n")
@@ -74,8 +77,9 @@ if __name__ == "__main__":
     json_safe_post = {"type": post["type"], "text": post["text"]}
     if "image_bytes" in post:
         json_safe_post["image_bytes_b64"] = base64.b64encode(post["image_bytes"]).decode("ascii")
-    else:
+    elif "image_url" in post:
         json_safe_post["image_url"] = post["image_url"]
+    # aks holda (masalan Reading uchun) rasm maydoni umuman qo'shilmaydi
 
     # Keyingi bosqich (publish_content.py) o'qishi uchun saqlaymiz
     with open("content.json", "w", encoding="utf-8") as f:
